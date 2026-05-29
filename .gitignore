@@ -1,0 +1,15 @@
+.venv/
+.venv-win/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+build/
+dist/
+release/
+*.spec.bak
+
+.DS_Store
+.idea/
