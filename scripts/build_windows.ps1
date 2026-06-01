@@ -4,6 +4,21 @@ Set-StrictMode -Version Latest
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location $Root
 
+function Invoke-Checked {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Command,
+
+        [Parameter(Mandatory = $false)]
+        [string[]]$Arguments = @()
+    )
+
+    & $Command @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "Command failed with exit code ${LASTEXITCODE}: $Command $($Arguments -join ' ')"
+    }
+}
+
 function Resolve-Python {
     try {
         & py -3 --version | Out-Null
@@ -25,11 +40,11 @@ $VenvDir = Join-Path $Root ".venv-win"
 $VenvPython = Join-Path $VenvDir "Scripts\python.exe"
 
 if (-not (Test-Path $VenvPython)) {
-    & $Python.Command @($Python.Args) -m venv $VenvDir
+    Invoke-Checked $Python.Command ($Python.Args + @("-m", "venv", $VenvDir))
 }
 
-& $VenvPython -m pip install --upgrade pip
-& $VenvPython -m pip install -r requirements.txt pyinstaller
+Invoke-Checked $VenvPython @("-m", "pip", "install", "--upgrade", "pip")
+Invoke-Checked $VenvPython @("-m", "pip", "install", "-r", "requirements.txt", "pyinstaller")
 
 if (Test-Path "build") {
     Remove-Item "build" -Recurse -Force
@@ -41,7 +56,7 @@ if (Test-Path "release") {
     Remove-Item "release" -Recurse -Force
 }
 
-& $VenvPython -m PyInstaller --clean --noconfirm DesktopPet.spec
+Invoke-Checked $VenvPython @("-m", "PyInstaller", "--clean", "--noconfirm", "DesktopPet.spec")
 
 $IsccCandidates = @(
     "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
@@ -57,8 +72,13 @@ if (-not $Iscc) {
     exit 0
 }
 
-& $Iscc "installer\DesktopPet.iss"
+Invoke-Checked $Iscc @("installer\DesktopPet.iss")
+
+$InstallerPath = Join-Path $Root "release\DesktopPetSetup.exe"
+if (-not (Test-Path $InstallerPath)) {
+    throw "Installer was not created: $InstallerPath"
+}
 
 Write-Host ""
 Write-Host "Windows installer created:"
-Write-Host "$Root\release\DesktopPetSetup.exe"
+Write-Host $InstallerPath
